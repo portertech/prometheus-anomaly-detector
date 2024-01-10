@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+  tailctrl-anomaly:
+    image: tailctrl/anomaly:latest
+    network_mode: host
+    container_name: tailctrl-anomaly
+    environment:
+      FLT_PROM_URL: ${FLT_PROM_URL}
+      FLT_METRICS_LIST: ${FLT_METRICS_LIST}
+      FLT_DATA_START_TIME: 3d
+      FLT_RETRAINING_INTERVAL_MINUTES: 15
+      FLT_ROLLING_TRAINING_WINDOW_SIZE: 15d
+      APP_FILE: app.py
+    expose:
+      - 8080
+    ports:
+      - 127.0.0.1:8080:8080

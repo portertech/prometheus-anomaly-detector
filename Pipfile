@@ -4,18 +4,18 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pandas = "*"
+pandas = "==1.5.3"
 schedule = "*"
 prometheus_client = "*"
 prometheus_api_client = "*"
 tornado = "*"
 pystan = "==2.19.1.1"
-prophet = "*"
+prophet = "==1.1.5"
 dateparser = "*"
 mlflow = "*"
 numpy = "*"
 scikit-learn = "*"
-tensorflow = ">=2.0, <2.5"
+tensorflow = "==2.13.1"
 
 [requires]
 python_version = "3.8"
