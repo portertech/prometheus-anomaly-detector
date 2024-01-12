@@ -2,6 +2,7 @@
 import time
 import os
 import logging
+import signal
 from datetime import datetime
 from multiprocessing import Pool, Process, Queue
 from multiprocessing import cpu_count
@@ -15,6 +16,8 @@ from configuration import Configuration
 import model
 import schedule
 
+state = "running"
+
 # Set up logging
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +25,6 @@ METRICS_LIST = Configuration.metrics_list
 
 # list of ModelPredictor Objects shared between processes
 PREDICTOR_MODEL_LIST = list()
-
 
 pc = PrometheusConnect(
     url=Configuration.prometheus_url,
@@ -73,12 +75,15 @@ class MainHandler(tornado.web.RequestHandler):
         for predictor_model in self.settings["model_list"]:
             # get the current metric value so that it can be compared with the
             # predicted values
-            current_metric_value = Metric(
-                pc.get_current_metric_value(
-                    metric_name=predictor_model.metric.metric_name,
-                    label_config=predictor_model.metric.label_config,
-                )[0]
-            )
+            try:
+                current_metric_value = Metric(
+                    pc.get_current_metric_value(
+                        metric_name=predictor_model.metric.metric_name,
+                        label_config=predictor_model.metric.label_config,
+                    )[0]
+                )
+            except IndexError:
+                continue
 
             metric_name = predictor_model.metric.metric_name
             prediction = predictor_model.predict_value(datetime.now())
@@ -122,9 +127,9 @@ def make_app(data_queue):
 def train_individual_model(predictor_model, initial_run):
     metric_to_predict = predictor_model.metric
     pc = PrometheusConnect(
-    url=Configuration.prometheus_url,
-    headers=Configuration.prom_connect_headers,
-    disable_ssl=True,
+        url=Configuration.prometheus_url,
+        headers=Configuration.prom_connect_headers,
+        disable_ssl=True,
     )
 
     data_start_time = datetime.now() - Configuration.metric_chunk_size
@@ -165,8 +170,16 @@ def train_model(initial_run=False, data_queue=None):
     PREDICTOR_MODEL_LIST = result
     data_queue.put(PREDICTOR_MODEL_LIST)
 
+def terminateProcess(signalNumber, frame):
+    _LOGGER.info("Received signal - terminating the process")
+    global state
+    state = "terminating"
 
 if __name__ == "__main__":
+    # Trap TERM and INT for process termination.
+    signal.signal(signal.SIGTERM, terminateProcess)
+    signal.signal(signal.SIGINT, terminateProcess)
+
     # Queue to share data between the tornado server and the model training
     predicted_model_queue = Queue()
 
@@ -188,9 +201,17 @@ if __name__ == "__main__":
         "Will retrain model every %s minutes", Configuration.retraining_interval_minutes
     )
 
-    while True:
+    while state == "running":
         schedule.run_pending()
         time.sleep(1)
 
-    # join the server process in case the main process ends
-    server_process.join()
+    # terminating ...
+
+    # drain the queue
+    while not predicted_model_queue.empty():
+        predicted_model_queue.get_nowait()
+
+    # kill and join the server process
+    if server_process.is_alive():
+        server_process.kill()
+        server_process.join(timeout=3)
