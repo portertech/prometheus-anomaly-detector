@@ -21,41 +21,23 @@ state = "running"
 # Set up logging
 _LOGGER = logging.getLogger(__name__)
 
+# Configured Prometheus metric names list
 METRICS_LIST = Configuration.metrics_list
 
-# list of ModelPredictor Objects shared between processes
+# Set of unique metric series
+UNIQUE_SERIES_SET = set()
+
+# List of ModelPredictor Objects shared between processes
 PREDICTOR_MODEL_LIST = list()
+
+# A gauge set for the predicted values
+GAUGE_DICT = dict()
 
 pc = PrometheusConnect(
     url=Configuration.prometheus_url,
     headers=Configuration.prom_connect_headers,
     disable_ssl=True,
 )
-
-for metric in METRICS_LIST:
-    # Initialize a predictor for all metrics first
-    metric_init = pc.get_current_metric_value(metric_name=metric)
-
-    for unique_metric in metric_init:
-        PREDICTOR_MODEL_LIST.append(
-            model.MetricPredictor(
-                unique_metric,
-                rolling_data_window_size=Configuration.rolling_training_window_size,
-            )
-        )
-
-# A gauge set for the predicted values
-GAUGE_DICT = dict()
-for predictor in PREDICTOR_MODEL_LIST:
-    unique_metric = predictor.metric
-    label_list = list(unique_metric.label_config.keys())
-    label_list.append("value_type")
-    if unique_metric.metric_name not in GAUGE_DICT:
-        GAUGE_DICT[unique_metric.metric_name] = Gauge(
-            unique_metric.metric_name + "_" + predictor.model_name,
-            predictor.model_description,
-            label_list,
-        )
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -71,9 +53,9 @@ class MainHandler(tornado.web.RequestHandler):
 
     async def get(self):
         """Fetch and publish metric values asynchronously."""
-        # update metric value on every request and publish the metric
+        # Update metric value on every request and publish the metric
         for predictor_model in self.settings["model_list"]:
-            # get the current metric value so that it can be compared with the
+            # Get the current metric value so that it can be compared with the
             # predicted values
             try:
                 current_metric_value = Metric(
@@ -104,8 +86,8 @@ class MainHandler(tornado.web.RequestHandler):
             ):
                 anomaly = 0
 
-            # create a new time series that has value_type=anomaly
-            # this value is 1 if an anomaly is found 0 if not
+            # Create a new time series that has value_type=anomaly
+            # This value is 1 if an anomaly is found 0 if not
             GAUGE_DICT[metric_name].labels(
                 **predictor_model.metric.label_config, value_type="anomaly"
             ).set(anomaly)
@@ -123,6 +105,46 @@ def make_app(data_queue):
             (r"/", MainHandler, dict(data_queue=data_queue)),
         ]
     )
+
+def update_model_list():
+    global UNIQUE_SERIES_SET
+    global PREDICTOR_MODEL_LIST
+    global GAUGE_DICT
+
+    _LOGGER.info("Updating predictor model list from Prometheus metrics")
+
+    for metric_name in METRICS_LIST:
+        metric_list = pc.get_current_metric_value(metric_name=metric_name)
+
+        for unique_metric in metric_list:
+            metric = Metric(unique_metric)
+            unique_key = metric.metric_name + "-" + "-".join(metric.label_config.values())
+
+            # Initialize a predictor for new metrics
+            if unique_key not in UNIQUE_SERIES_SET:
+                _LOGGER.info(
+                    "New predictor model from Prometheus metrics: %s",
+                    unique_key
+                )
+
+                UNIQUE_SERIES_SET.add(unique_key)
+
+                predictor = model.MetricPredictor(
+                    unique_metric,
+                    rolling_data_window_size=Configuration.rolling_training_window_size,
+                )
+
+                PREDICTOR_MODEL_LIST.append(predictor)
+
+                if metric.metric_name not in GAUGE_DICT:
+                    label_list = list(metric.label_config.keys())
+                    label_list.append("value_type")
+
+                    GAUGE_DICT[metric.metric_name] = Gauge(
+                        metric.metric_name + "_" + predictor.model_name,
+                        predictor.model_description,
+                        label_list,
+                    )
 
 def train_individual_model(predictor_model, initial_run):
     metric_to_predict = predictor_model.metric
@@ -183,6 +205,9 @@ if __name__ == "__main__":
     # Queue to share data between the tornado server and the model training
     predicted_model_queue = Queue()
 
+    # Update model list
+    update_model_list()
+
     # Initial run to generate metrics, before they are exposed
     train_model(initial_run=True, data_queue=predicted_model_queue)
 
@@ -193,6 +218,11 @@ if __name__ == "__main__":
     # Start up the server to expose the metrics.
     server_process.start()
 
+    # Schedule the model list updates
+    schedule.every(Configuration.retraining_interval_minutes).minutes.do(
+        update_model_list
+    )
+
     # Schedule the model training
     schedule.every(Configuration.retraining_interval_minutes).minutes.do(
         train_model, initial_run=False, data_queue=predicted_model_queue
@@ -201,17 +231,18 @@ if __name__ == "__main__":
         "Will retrain model every %s minutes", Configuration.retraining_interval_minutes
     )
 
+    # Run scheduled jobs
     while state == "running":
         schedule.run_pending()
         time.sleep(1)
 
-    # terminating ...
+    # Terminating ...
 
-    # drain the queue
+    # Drain the queue
     while not predicted_model_queue.empty():
         predicted_model_queue.get_nowait()
 
-    # kill and join the server process
+    # Kill and join the server process
     if server_process.is_alive():
         server_process.kill()
         server_process.join(timeout=3)
