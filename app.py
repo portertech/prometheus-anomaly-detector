@@ -192,6 +192,10 @@ def train_model(initial_run=False, data_queue=None):
     PREDICTOR_MODEL_LIST = result
     data_queue.put(PREDICTOR_MODEL_LIST)
 
+def scheduled_job(data_queue=None):
+    update_model_list()
+    train_model(initial_run=False, data_queue=data_queue)
+
 def terminateProcess(signalNumber, frame):
     _LOGGER.info("Received signal - terminating the process")
     global state
@@ -218,14 +222,9 @@ if __name__ == "__main__":
     # Start up the server to expose the metrics.
     server_process.start()
 
-    # Schedule the model list updates
+    # Schedule model list updates and model training
     schedule.every(Configuration.retraining_interval_minutes).minutes.do(
-        update_model_list
-    )
-
-    # Schedule the model training
-    schedule.every(Configuration.retraining_interval_minutes).minutes.do(
-        train_model, initial_run=False, data_queue=predicted_model_queue
+        scheduled_job, data_queue=predicted_model_queue
     )
     _LOGGER.info(
         "Will retrain model every %s minutes", Configuration.retraining_interval_minutes
