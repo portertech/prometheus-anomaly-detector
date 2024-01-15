@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 class MetricPredictor:
     """docstring for Predictor."""
 
-    model_name = "Fourier"
+    model_name = "fourier"
     model_description = "Forecast value based on fourier analysis"
     model = None
     predicted_df = None
@@ -122,7 +122,7 @@ class MetricPredictor:
 
     def predict_value(self, prediction_datetime):
         """Return the predicted value of the metric for the prediction_datetime."""
-        nearest_index = self.predicted_df.index.get_loc(
-            prediction_datetime, method="nearest"
-        )
+        nearest_index = self.predicted_df.index.get_indexer(
+            [prediction_datetime], method="nearest"
+        )[0]
         return self.predicted_df.iloc[[nearest_index]]

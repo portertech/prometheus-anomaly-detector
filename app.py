@@ -14,6 +14,8 @@ from prometheus_client import Gauge, generate_latest, REGISTRY
 from prometheus_api_client import PrometheusConnect, Metric
 from configuration import Configuration
 import model
+import model_fourier
+import model_lstm
 import schedule
 
 state = "running"
@@ -23,6 +25,12 @@ _LOGGER = logging.getLogger(__name__)
 
 # Configured Prometheus metric names list
 METRICS_LIST = Configuration.metrics_list
+
+MODEL_LIST = {
+    "prophet": model,
+    "fourier": model_fourier,
+    "lstm": model_lstm
+}
 
 # Set of unique metric series
 UNIQUE_SERIES_SET = set()
@@ -129,7 +137,7 @@ def update_model_list():
 
                 UNIQUE_SERIES_SET.add(unique_key)
 
-                predictor = model.MetricPredictor(
+                predictor = MODEL_LIST[Configuration.model].MetricPredictor(
                     unique_metric,
                     rolling_data_window_size=Configuration.rolling_training_window_size,
                 )

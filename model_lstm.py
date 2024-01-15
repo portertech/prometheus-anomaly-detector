@@ -157,7 +157,7 @@ class MetricPredictor:
 
     def predict_value(self, prediction_datetime):
         """Return the predicted value of the metric for the prediction_datetime."""
-        nearest_index = self.predicted_df.index.get_loc(
-            prediction_datetime, method="nearest"
-        )
+        nearest_index = self.predicted_df.index.get_indexer(
+            [prediction_datetime], method="nearest"
+        )[0]
         return self.predicted_df.iloc[[nearest_index]]

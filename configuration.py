@@ -40,6 +40,9 @@ class Configuration:
         )
     ).split(";")
 
+    # Model to use
+    model = str(os.getenv("FLT_MODEL", "prophet"))
+
     # this will create a rolling data window on which the model will be trained
     # example: if set to 15d will train the model on past 15 days of data,
     # every time new data is added, it will truncate the data that is out of this range.
