@@ -168,13 +168,16 @@ def train_individual_model(predictor_model, initial_run):
             datetime.now() - Configuration.rolling_training_window_size
         )
 
-    # Download new metric data from prometheus
-    new_metric_data = pc.get_metric_range_data(
-        metric_name=metric_to_predict.metric_name,
-        label_config=metric_to_predict.label_config,
-        start_time=data_start_time,
-        end_time=datetime.now(),
-    )[0]
+    try:
+        # Download new metric data from Prometheus
+        new_metric_data = pc.get_metric_range_data(
+            metric_name=metric_to_predict.metric_name,
+            label_config=metric_to_predict.label_config,
+            start_time=data_start_time,
+            end_time=datetime.now(),
+        )[0]
+    except IndexError:
+        return predictor_model
 
     # Train the new model
     start_time = datetime.now()
