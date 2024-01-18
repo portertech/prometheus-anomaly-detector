@@ -24,7 +24,7 @@ class MetricPredictor:
 
     def train(self, metric_data=None, prediction_duration=15):
         """Train the Prophet model and store the predictions in predicted_df."""
-        prediction_freq = "1MIN"
+        prediction_freq = "30S"
         # convert incoming metric to Metric Object
         if metric_data:
             # because the rolling_data_window_size is set, this df should not bloat
@@ -33,7 +33,10 @@ class MetricPredictor:
         # Don't really need to store the model, as prophet models are not retrainable
         # But storing it as an example for other models that can be retrained
         self.model = Prophet(
-            daily_seasonality=True, weekly_seasonality=True, yearly_seasonality=True
+            daily_seasonality=True,
+            weekly_seasonality=True,
+            yearly_seasonality=False,
+            changepoint_prior_scale=0.2
         )
 
         _LOGGER.info(
