@@ -39,13 +39,15 @@ class MetricPredictor:
             weekly_seasonality=True,
             yearly_seasonality=False,
             changepoint_prior_scale=0.2,
-            interval_width=0.95
+            interval_width=0.95,
+            uncertainty_samples=100,
+            mcmc_samples=100
         )
 
         _LOGGER.info(
             "training data range: %s - %s", self.metric.start_time, self.metric.end_time
         )
-        # _LOGGER.info("training data end time: %s", self.metric.end_time)
+
         _LOGGER.debug("begin training")
 
         self.model.fit(self.metric.metric_values)
@@ -54,11 +56,15 @@ class MetricPredictor:
             freq=prediction_freq,
             include_history=False,
         )
+
+        _LOGGER.debug("done training")
+
         forecast = self.model.predict(future)
         forecast["timestamp"] = forecast["ds"]
         forecast = forecast[["timestamp", "yhat", "yhat_lower", "yhat_upper"]]
         forecast = forecast.set_index("timestamp")
         self.predicted_df = forecast
+
         _LOGGER.debug(forecast)
 
     def predict_value(self, prediction_datetime):
