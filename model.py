@@ -22,14 +22,14 @@ class MetricPredictor:
         """Initialize the Metric object."""
         self.metric = Metric(metric, rolling_data_window_size)
 
-    def train(self, metric_data=None, prediction_duration=15):
+    def train(self, metric_data=None, prediction_duration=120):
         """Train the Prophet model and store the predictions in predicted_df."""
         prediction_periods = int(prediction_duration) * 2
         prediction_freq = "30S"
 
-        # convert incoming metric to Metric Object
+        # Convert incoming metric to Metric Object
         if metric_data:
-            # because the rolling_data_window_size is set, this df should not bloat
+            # Because the rolling_data_window_size is set, this df should not bloat
             self.metric += Metric(metric_data)
 
         # Don't really need to store the model, as prophet models are not retrainable
@@ -40,8 +40,7 @@ class MetricPredictor:
             yearly_seasonality=False,
             changepoint_prior_scale=0.2,
             interval_width=0.95,
-            uncertainty_samples=100,
-            mcmc_samples=100
+            uncertainty_samples=500
         )
 
         _LOGGER.info(
