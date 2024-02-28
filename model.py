@@ -24,8 +24,8 @@ class MetricPredictor:
 
     def train(self, metric_data=None, prediction_duration=120):
         """Train the Prophet model and store the predictions in predicted_df."""
-        prediction_periods = (int(prediction_duration) * 2) + 1
-        prediction_freq = "30S"
+        prediction_periods = int(prediction_duration) + 3
+        prediction_freq = "1MIN"
 
         # Convert incoming metric to Metric Object
         if metric_data:
@@ -38,9 +38,9 @@ class MetricPredictor:
             daily_seasonality=True,
             weekly_seasonality=True,
             yearly_seasonality=False,
-            changepoint_prior_scale=0.2,
-            interval_width=0.95,
-            uncertainty_samples=500
+            changepoint_prior_scale=0.1,
+            interval_width=0.90,
+            uncertainty_samples=100
         )
 
         _LOGGER.info(

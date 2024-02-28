@@ -18,6 +18,9 @@ _LOGGER = logging.getLogger(__name__)
 class Configuration:
     """docstring for Configuration."""
 
+    # Port to listen on for HTTP requests
+    listen_port = str(os.getenv("FLT_LISTEN_PORT", "8080"))
+
     # url for the prometheus host
     prometheus_url = os.getenv("FLT_PROM_URL")
 
