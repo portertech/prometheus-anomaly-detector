@@ -64,7 +64,10 @@ class MainHandler(tornado.web.RequestHandler):
         # Update metric value on every request and publish the metric
         for predictor_model in self.settings["model_list"]:
             metric_name = predictor_model.metric.metric_name
-            prediction = predictor_model.predict_value(datetime.now())
+            try:
+                prediction = predictor_model.predict_value(datetime.now())
+            except AttributeError:
+                continue
 
             # Check for all the columns available in the prediction
             # and publish the values for each of them
