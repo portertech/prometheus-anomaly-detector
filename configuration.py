@@ -24,6 +24,9 @@ class Configuration:
     # url for the prometheus host
     prometheus_url = os.getenv("FLT_PROM_URL")
 
+    # url for confidence api to adjust prediction interval
+    confidence_api_url = os.getenv("FLT_CONFIDENCE_API_URL")
+
     # any headers that need to be passed while connecting to the prometheus host
     prom_connect_headers = None
     # example oath token passed as a header

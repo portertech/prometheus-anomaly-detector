@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import signal
+import requests
 from datetime import datetime
 from multiprocessing import Pool, Process, Queue
 from multiprocessing import cpu_count
@@ -69,12 +70,37 @@ class MainHandler(tornado.web.RequestHandler):
             except AttributeError:
                 continue
 
-            # Check for all the columns available in the prediction
-            # and publish the values for each of them
-            for column_name in list(prediction.columns):
-                GAUGE_DICT[metric_name].labels(
-                    **predictor_model.metric.label_config, value_type=column_name
-                ).set(prediction[column_name][0])
+            yhat = prediction["yhat"][0]
+            yhat_upper = prediction["yhat_upper"][0]
+            yhat_lower = prediction["yhat_lower"][0]
+
+            GAUGE_DICT[metric_name].labels(
+                **predictor_model.metric.label_config, value_type="yhat"
+            ).set(yhat)
+
+            confidence = 1
+
+            if Configuration.confidence_api_url:
+                try:
+                    params = {**predictor_model.metric.label_config, "metric_name": metric_name}
+                    response = requests.get(Configuration.confidence_api_url, params=params, timeout=1)
+
+                    if response.status_code == requests.codes.ok:
+                        body = response.json()
+                        confidence = body["confidence"]
+                except:
+                    pass
+
+            upper = yhat + ((yhat_upper - yhat) * confidence)
+            lower = yhat - ((yhat - yhat_lower) * confidence)
+
+            GAUGE_DICT[metric_name].labels(
+                **predictor_model.metric.label_config, value_type="yhat_upper"
+            ).set(upper)
+
+            GAUGE_DICT[metric_name].labels(
+                **predictor_model.metric.label_config, value_type="yhat_lower"
+            ).set(lower)
 
         self.write(generate_latest(REGISTRY).decode("utf-8"))
         self.set_header("Content-Type", "text; charset=utf-8")

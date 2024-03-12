@@ -16,6 +16,7 @@ mlflow = "*"
 numpy = "*"
 scikit-learn = "*"
 tensorflow = "==2.13.1"
+requests = "*"
 
 [requires]
 python_version = "3.8"

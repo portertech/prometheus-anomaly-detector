@@ -7,6 +7,7 @@ services:
     container_name: tailctrl-anomaly
     environment:
       FLT_PROM_URL: ${FLT_PROM_URL}
+      FLT_CONFIDENCE_API_URL: ${FLT_CONFIDENCE_API_URL}
       FLT_METRICS_LIST: ${FLT_METRICS_LIST}
       FLT_MODEL: ${FLT_MODEL}
       FLT_ROLLING_TRAINING_WINDOW_SIZE: 15d

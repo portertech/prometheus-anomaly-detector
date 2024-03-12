@@ -9,3 +9,4 @@ mlflow
 numpy
 scikit-learn
 tensorflow==2.13.1
+requests
